@@ -68,7 +68,16 @@ export default async function handler(req, res) {
     // --- Get data from Stripe ---
     const email = session.customer_details.email;
     const name = session.customer_details.name;
-    const stripePriceId = session.line_items.data[0].price.id;
+    
+    // Retrieve line items separately since they're not included by default
+    const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+    
+    if (!lineItems.data || lineItems.data.length === 0) {
+      console.error('No line items found in checkout session');
+      return res.status(200).json({ received: true, error: 'No line items found' });
+    }
+    
+    const stripePriceId = lineItems.data[0].price.id;
 
     // We need the subscription object to get the expiry date
     const subscription = await stripe.subscriptions.retrieve(session.subscription);
