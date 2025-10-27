@@ -87,7 +87,7 @@ export async function createFronteggUser(email, name, tenantId, token) {
     const payload = {
       email: email,
       name: name || 'New User',
-      roleIds: [], // Empty array for now - you may want to assign specific roles
+      roleIds: ['c432dbc9-49f3-4fb3-afe1-a4b354e4e369'], // Default role ID
       provider: 'local',
       skipInviteEmail: false,
     };
