@@ -87,7 +87,7 @@ export default async function handler(req, res) {
 
     // Get the expiry date from the subscription schedule
     // Priority: cancel_at > canceled_at > current_phase.end_date
-    let expiryTimestamp = schedule.current_period_end;
+    let expiryTimestamp = schedule.current_phase.end_date;
     
     if (!expiryTimestamp) {
       console.error('No expiration timestamp found in subscription schedule');
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     }
     
     const validUntil = new Date(expiryTimestamp * 1000).toISOString();
-    console.log(`Using expiration date: ${validUntil} (from ${schedule.cancel_at ? 'cancel_at' : schedule.canceled_at ? 'canceled_at' : 'current_phase.end_date'})`);
+    console.log(`Using expiration date: ${validUntil} (from ${schedule.current_phase.end_date})`);
 
     // --- Map Stripe Price ID to Frontegg Feature ID ---
     const fronteggFeatureId = PLAN_MAP[stripePriceId];
