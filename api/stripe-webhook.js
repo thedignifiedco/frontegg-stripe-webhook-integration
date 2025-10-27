@@ -5,7 +5,7 @@ import {
   createFronteggAccount,
   createFronteggUser,
   createEntitlement,
-} from '../_lib/frontegg';
+} from '../_lib/frontegg.js';
 
 // Initialize Stripe with your API key (secret key, not webhook secret)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
