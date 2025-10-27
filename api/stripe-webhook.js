@@ -14,13 +14,13 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 // --- IMPORTANT ---
 // 1. This maps your Stripe Price ID to your Frontegg Feature ID.
 // 2. You MUST update this with your actual IDs.
+// 3. This webhook handles 'subscription_schedule.created' events.
 //
 // Example:
-// 'price_1LqXyZJ...': 'my-frontegg-premium-feature-id'
+// 'price_1SMf0eS4gem0F368v4m5Ty7k': 'my-frontegg-premium-feature-id'
 //
 const PLAN_MAP = {
-  'price_YOUR_STRIPE_PRICE_ID_1': 'frontegg-feature-id-for-plan-1',
-  'price_YOUR_STRIPE_PRICE_ID_2': 'frontegg-feature-id-for-plan-2',
+  'price_1SMf0eS4gem0F368v4m5Ty7k': 'f5fec7df-c09f-40c7-a68e-6905f7ec9574'
 };
 // -----------------
 
@@ -58,30 +58,35 @@ export default async function handler(req, res) {
     event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
   } catch (err) {
     console.warn(`Webhook signature verification failed: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).send('Webhook Error: Signature verification failed');
   }
 
-  // 2. HANDLE THE 'checkout.session.completed' EVENT
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
+  // 2. HANDLE THE 'subscription_schedule.created' EVENT
+  if (event.type === 'subscription_schedule.created') {
+    const schedule = event.data.object;
 
     // --- Get data from Stripe ---
-    const email = session.customer_details.email;
-    const name = session.customer_details.name;
+    // Retrieve customer information using customer ID
+    const customer = await stripe.customers.retrieve(schedule.customer);
+    const email = customer.email;
+    const name = customer.name;
     
-    // Retrieve line items separately since they're not included by default
-    const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
-    
-    if (!lineItems.data || lineItems.data.length === 0) {
-      console.error('No line items found in checkout session');
-      return res.status(200).json({ received: true, error: 'No line items found' });
+    // Extract price ID from the first phase of the schedule
+    if (!schedule.phases || schedule.phases.length === 0) {
+      console.error('No phases found in subscription schedule');
+      return res.status(200).json({ received: true, error: 'No phases found' });
     }
     
-    const stripePriceId = lineItems.data[0].price.id;
+    const firstPhase = schedule.phases[0];
+    if (!firstPhase.items || firstPhase.items.length === 0) {
+      console.error('No items found in schedule phase');
+      return res.status(200).json({ received: true, error: 'No items found in phase' });
+    }
+    
+    const stripePriceId = firstPhase.items[0].price;
 
-    // We need the subscription object to get the expiry date
-    const subscription = await stripe.subscriptions.retrieve(session.subscription);
-    const expiryTimestamp = subscription.current_period_end;
+    // Get the expiry date from the current phase end date
+    const expiryTimestamp = schedule.current_phase.end_date;
     const validUntil = new Date(expiryTimestamp * 1000).toISOString();
 
     // --- Map Stripe Price ID to Frontegg Feature ID ---
