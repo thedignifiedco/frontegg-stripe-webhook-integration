@@ -85,9 +85,17 @@ export default async function handler(req, res) {
     
     const stripePriceId = firstPhase.items[0].price;
 
-    // Get the expiry date from the current phase end date
-    const expiryTimestamp = schedule.current_phase.end_date;
+    // Get the expiry date from the subscription schedule
+    // Priority: cancel_at > canceled_at > current_phase.end_date
+    let expiryTimestamp = schedule.current_period_end;
+    
+    if (!expiryTimestamp) {
+      console.error('No expiration timestamp found in subscription schedule');
+      return res.status(200).json({ received: true, error: 'No expiration date found' });
+    }
+    
     const validUntil = new Date(expiryTimestamp * 1000).toISOString();
+    console.log(`Using expiration date: ${validUntil} (from ${schedule.cancel_at ? 'cancel_at' : schedule.canceled_at ? 'canceled_at' : 'current_phase.end_date'})`);
 
     // --- Map Stripe Price ID to Frontegg Feature ID ---
     const fronteggFeatureId = PLAN_MAP[stripePriceId];
@@ -139,8 +147,8 @@ export default async function handler(req, res) {
       }
 
       // (3) Update/Create the entitlement (subscription)
-      await createEntitlement(tenantId, fronteggFeatureId, validUntil, token);
-      console.log(`Successfully created entitlement for tenantId: ${tenantId}`);
+      await createEntitlement(tenantId, userId, fronteggFeatureId, validUntil, token);
+      console.log(`Successfully created entitlement for tenantId: ${tenantId}, userId: ${userId}`);
 
       // --- END FRONTEGG FLOW ---
     } catch (error) {

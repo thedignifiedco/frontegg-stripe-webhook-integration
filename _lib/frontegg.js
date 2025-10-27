@@ -52,12 +52,20 @@ export async function getUserByEmail(email, token) {
  */
 export async function createFronteggAccount(email, token) {
   try {
+    // Generate a unique tenantId based on email
+    const tenantId = `tenant_${email.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+    
+    const payload = {
+      tenantId: tenantId,
+      name: `${email}'s Account`,
+    };
+    
+    console.log('Creating Frontegg account with payload:', payload);
+    console.log('Using endpoint: /tenants/resources/tenants/v1');
+    
     const { data } = await fronteggApi.post(
-      '/tenants/v1',
-      {
-        name: `${email}'s Account`, // Or use a company name if you have it
-        email: email,
-      },
+      '/tenants/resources/tenants/v1',
+      payload,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -65,6 +73,8 @@ export async function createFronteggAccount(email, token) {
     return data; // Returns the new account object, including tenantId
   } catch (error) {
     console.error('Error creating Frontegg account:', error.response?.data || error.message);
+    console.error('Error status:', error.response?.status);
+    console.error('Error headers:', error.response?.headers);
     throw new Error('Error creating Frontegg account');
   }
 }
@@ -74,20 +84,33 @@ export async function createFronteggAccount(email, token) {
  */
 export async function createFronteggUser(email, name, tenantId, token) {
   try {
+    const payload = {
+      email: email,
+      name: name || 'New User',
+      roleIds: [], // Empty array for now - you may want to assign specific roles
+      provider: 'local',
+      skipInviteEmail: false,
+    };
+    
+    console.log('Creating Frontegg user with payload:', payload);
+    console.log('Using endpoint: /identity/resources/users/v2');
+    console.log('Using tenantId:', tenantId);
+    
     const { data } = await fronteggApi.post(
-      '/identity/v1/users',
+      '/identity/resources/users/v2',
+      payload,
       {
-        email: email,
-        name: name || 'New User', // Use name from Stripe if available
-        tenantId: tenantId,
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'frontegg-tenant-id': tenantId,
+        },
       }
     );
     return data; // Returns the new user object
   } catch (error) {
     console.error('Error creating Frontegg user:', error.response?.data || error.message);
+    console.error('Error status:', error.response?.status);
+    console.error('Error headers:', error.response?.headers);
     throw new Error('Error creating Frontegg user');
   }
 }
@@ -95,15 +118,21 @@ export async function createFronteggUser(email, name, tenantId, token) {
 /**
  * (3) Create an entitlement (assign subscription)
  */
-export async function createEntitlement(tenantId, featureId, validUntil, token) {
+export async function createEntitlement(tenantId, userId, planId, expirationDate, token) {
   try {
+    const payload = {
+      planId: planId, // The Frontegg plan ID (was featureId)
+      tenantId: tenantId,
+      userId: userId,
+      expirationDate: expirationDate, // ISO 8601 string (was validUntil)
+    };
+    
+    console.log('Creating Frontegg entitlement with payload:', payload);
+    console.log('Using endpoint: /entitlements/resources/entitlements/v2');
+    
     const { data } = await fronteggApi.post(
-      '/entitlements/v2',
-      {
-        tenantId: tenantId,
-        featureId: featureId, // The Frontegg feature/plan ID
-        validUntil: validUntil, // ISO 8601 string
-      },
+      '/entitlements/resources/entitlements/v2',
+      payload,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -111,6 +140,8 @@ export async function createEntitlement(tenantId, featureId, validUntil, token) 
     return data;
   } catch (error) {
     console.error('Error creating entitlement:', error.response?.data || error.message);
+    console.error('Error status:', error.response?.status);
+    console.error('Error headers:', error.response?.headers);
     throw new Error('Error creating entitlement');
   }
 }
